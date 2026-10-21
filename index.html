@@ -1,0 +1,802 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="MVB Stats">
+<meta name="theme-color" content="#57068c">
+<title>MVB Stats</title>
+<link rel="manifest" href='data:application/manifest+json,{"name":"MVB Serve %26 Pass Stats","short_name":"MVB Stats","start_url":".","display":"standalone","background_color":"%23111114","theme_color":"%2357068c"}'>
+<link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'%3E%3Crect width='180' height='180' rx='40' fill='%2357068c'/%3E%3Ctext x='90' y='118' font-family='-apple-system,Helvetica,Arial' font-size='72' font-weight='700' fill='white' text-anchor='middle'%3EMVB%3C/text%3E%3C/svg%3E">
+<style>
+:root{
+  --bg:#f4f4f6;--card:#fff;--ink:#17171c;--muted:#6b6b76;--line:#dcdce2;
+  --accent:#57068c;--accent-ink:#fff;--ok:#1f8f4e;--warn:#b45309;--bad:#b3261e;
+  --g0:#c62828;--g1:#e07b1a;--g2:#c9a400;--g3:#3f9a3f;--g4:#1f6fd1;
+  --tap:56px;
+  color-scheme:light dark;
+}
+@media (prefers-color-scheme:dark){
+  :root{--bg:#111114;--card:#1c1c22;--ink:#f1f1f4;--muted:#9a9aa6;--line:#2e2e37;}
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+[hidden]{display:none!important}
+html,body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.35 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;overscroll-behavior:none}
+body{padding:env(safe-area-inset-top,0) env(safe-area-inset-right,0) env(safe-area-inset-bottom,0) env(safe-area-inset-left,0);user-select:none;-webkit-user-select:none}
+button{font:inherit;color:inherit;background:var(--card);border:1px solid var(--line);border-radius:12px;min-height:var(--tap);padding:0 14px;cursor:pointer;touch-action:manipulation}
+button:active{transform:scale(.97)}
+button.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+button.ghost{background:transparent}
+button.danger{color:var(--bad);border-color:var(--bad)}
+button[disabled]{opacity:.45;pointer-events:none}
+input[type=text],input[type=date],input[type=number]{font:inherit;color:var(--ink);background:var(--card);border:1px solid var(--line);border-radius:10px;min-height:48px;padding:0 12px;width:100%}
+.screen{display:none;max-width:720px;margin:0 auto;padding:12px 16px 40px}
+.screen.active{display:block}
+.topbar{position:sticky;top:env(safe-area-inset-top,0);z-index:5;background:var(--bg);padding:8px 0 10px;display:flex;align-items:center;gap:10px}
+.topbar h1{font-size:18px;margin:0;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.topbar .sub{font-size:13px;color:var(--muted)}
+.badge{background:var(--accent);color:#fff;border-radius:999px;padding:4px 12px;font-weight:700;font-size:14px;white-space:nowrap}
+.card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:14px;margin:10px 0}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.row>*{flex:1 1 0}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(84px,1fr));gap:10px}
+.grid button{min-height:72px;font-size:28px;font-weight:700}
+.grid button.sel{background:var(--accent);color:#fff;border-color:var(--accent)}
+.grid button small{display:block;font-size:11px;font-weight:500;color:inherit;opacity:.75;line-height:1}
+.grades{display:grid;grid-template-columns:repeat(5,1fr);gap:8px}
+.grades button{min-height:64px;font-size:26px;font-weight:800;color:#fff;border:none}
+.grades .g0{background:var(--g0)}.grades .g1{background:var(--g1)}.grades .g2{background:var(--g2)}.grades .g3{background:var(--g3)}.grades .g4{background:var(--g4)}
+.label{font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin:6px 0}
+.list{display:flex;flex-direction:column;gap:8px}
+.list button{text-align:left;display:flex;justify-content:space-between;align-items:center}
+.item{display:flex;gap:8px}.item>button:first-child{flex:1;min-width:0}.item .trash{flex:0 0 56px;padding:0;display:flex;align-items:center;justify-content:center;color:var(--bad)}.item .trash svg{width:22px;height:22px;display:block}
+.muted{color:var(--muted)}
+.small{font-size:13px}
+.sheet-bg{position:fixed;inset:0;background:rgba(0,0,0,.45);display:none;z-index:20}
+.sheet-bg.open{display:block}
+.sheet{position:fixed;left:0;right:0;bottom:0;background:var(--card);border-radius:20px 20px 0 0;padding:16px 16px calc(16px + env(safe-area-inset-bottom,0));max-height:88vh;overflow:auto;z-index:21;transform:translateY(100%);transition:transform .18s ease;max-width:720px;margin:0 auto}
+.sheet.open{transform:none}
+.sheet h2{margin:0 0 10px;font-size:20px}
+.log{display:flex;gap:6px;overflow-x:auto;padding:4px 0}
+.chip{flex:0 0 auto;border:1px solid var(--line);border-radius:999px;padding:4px 10px;font-size:13px;background:var(--card)}
+.chip b{font-weight:800}
+.toast{position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom,0));transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:999px;font-size:14px;opacity:0;transition:opacity .15s;z-index:30;pointer-events:none;white-space:nowrap}
+.toast.show{opacity:1}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th,td{padding:5px 4px;text-align:right;border-bottom:1px solid var(--line)}
+th:first-child,td:first-child{text-align:left}
+th{color:var(--muted);font-weight:600}
+.status{font-size:13px;color:var(--muted);white-space:pre-wrap}
+.status.err{color:var(--bad)}
+.status.ok{color:var(--ok)}
+.pill{display:inline-flex;align-items:center;gap:6px;border-radius:999px;padding:4px 10px;font-size:12px;font-weight:600;border:1px solid var(--line);background:var(--card);min-height:0;white-space:nowrap}
+.pill::before{content:"";width:8px;height:8px;border-radius:50%;background:var(--muted)}
+.pill.live::before{background:var(--ok)}.pill.pending::before{background:var(--warn)}.pill.err::before{background:var(--bad)}
+.pill.live{color:var(--ok)}.pill.pending{color:var(--warn)}.pill.err{color:var(--bad)}
+.hint{font-size:13px;color:var(--muted);margin:4px 0 0}
+details summary{cursor:pointer;color:var(--muted);font-size:14px;min-height:40px;display:flex;align-items:center}
+</style>
+</head>
+<body>
+
+<!-- ============ HOME ============ -->
+<section id="home" class="screen active">
+  <div class="topbar">
+    <h1>MVB Serve &amp; Pass Stats</h1>
+    <button class="pill" id="syncPillHome" style="flex:0" onclick="UI.openSetup()">Not set up</button>
+  </div>
+
+  <div class="card">
+    <div class="row" style="margin-bottom:10px">
+      <button id="kindGame" class="primary" onclick="UI.setKind('game')">Game</button>
+      <button id="kindPractice" onclick="UI.setKind('practice')">Practice</button>
+    </div>
+    <div class="row" style="margin-bottom:8px" id="oppRow">
+      <input type="text" id="newOpp" placeholder="Opponent" autocomplete="off">
+    </div>
+    <div class="row" style="margin-bottom:8px">
+      <input type="date" id="newDate">
+      <button id="newHome" onclick="UI.toggleHome()">Home</button>
+    </div>
+    <button class="primary" style="width:100%" id="startBtn" onclick="UI.newGame()">Start game</button>
+  </div>
+
+  <div class="label">Games &amp; practices</div>
+  <div id="gameList" class="list"></div>
+  <p class="hint">Every serve and pass is sent to the team's Google Sheet as you tap. If the connection drops, taps queue on this device and send when it is back. The roster comes from the sheet's Roster tab.</p>
+  <div class="row" style="margin-top:8px"><button class="ghost small" onclick="UI.openSetup()">Connection settings</button><button class="ghost small" onclick="UI.openRoster()">Roster (offline fallback)</button></div>
+</section>
+
+<!-- ============ GAME ============ -->
+<section id="game" class="screen">
+  <div class="topbar">
+    <button class="ghost" style="flex:0" onclick="UI.goHome()">&#8249; Games</button>
+    <h1 id="gTitle">vs Opponent<br><span class="sub" id="gSub"></span></h1>
+    <span class="badge" id="gSet">Set 1</span>
+  </div>
+
+  <div class="row" style="margin:4px 0 10px">
+    <button onclick="UI.openSub()">Sub</button>
+    <button id="newSetBtn" onclick="UI.newSet()">New set</button>
+    <button class="pill" id="syncPillGame" onclick="UI.openSetup()">Not set up</button>
+  </div>
+
+  <div id="lineupPanel" class="card" hidden>
+    <div class="label" id="lineupLabel">Who is on the court? (tap to select)</div>
+    <div class="grid" id="lineupGrid"></div>
+    <button class="primary" style="width:100%;margin-top:12px" id="lineupStart" onclick="UI.startSet()">Start set</button>
+  </div>
+
+  <div id="playPanel">
+    <div class="label">On court — tap a player</div>
+    <div class="grid" id="courtGrid"></div>
+
+    <div class="row" style="margin-top:12px">
+      <button id="undoBtn" onclick="UI.undo()">Undo last</button>
+      <button class="ghost" onclick="UI.editLineup()">Edit lineup</button>
+    </div>
+    <div class="label" style="margin-top:12px">Recent</div>
+    <div class="log" id="log"></div>
+
+    <details style="margin-top:10px">
+      <summary>Game totals</summary>
+      <div id="totals"></div>
+    </details>
+    <button class="primary" style="width:100%;margin-top:20px" id="endBtn" onclick="UI.endGame()">End game</button>
+    <button class="ghost danger small" style="width:100%;margin-top:10px" onclick="UI.deleteGame(State.data.activeId)">Delete this game / practice</button>
+  </div>
+
+  <div id="finalPanel" class="card" hidden>
+    <div class="label">Final</div>
+    <p class="small muted" style="margin:0 0 10px" id="finalText"></p>
+    <div id="finalTotals"></div>
+    <div class="row" style="margin-top:12px">
+      <button onclick="UI.reopenGame()">Reopen</button>
+      <button class="primary" onclick="UI.goHome()">Back to games</button>
+    </div>
+  </div>
+</section>
+
+<!-- ============ GRADE SHEET ============ -->
+<div class="sheet-bg" id="sheetBg" onclick="UI.closeSheets()"></div>
+
+<div class="sheet" id="gradeSheet">
+  <h2 id="gradeTitle">#12</h2>
+  <div class="label">Serve</div>
+  <div class="grades" id="serveGrades"></div>
+  <div class="label" style="margin-top:14px">Pass (serve receive)</div>
+  <div class="grades" id="passGrades"></div>
+  <button class="ghost" style="width:100%;margin-top:12px" onclick="UI.closeSheets()">Cancel</button>
+</div>
+
+<div class="sheet" id="subSheet">
+  <h2 id="subTitle">Who is going out?</h2>
+  <div class="grid" id="subGrid"></div>
+  <button class="ghost" style="width:100%;margin-top:12px" onclick="UI.closeSheets()">Cancel</button>
+</div>
+
+<div class="sheet" id="setupSheet">
+  <h2>Google Sheet connection</h2>
+  <p class="small muted" style="margin:0 0 8px">Paste the Apps Script web app URL and the passcode. Set up once per device.</p>
+  <div class="label">Web app URL</div>
+  <input type="text" id="syncUrl" placeholder="https://script.google.com/macros/s/…/exec" autocomplete="off" autocapitalize="off" spellcheck="false">
+  <div class="label" style="margin-top:10px">Passcode</div>
+  <input type="text" id="syncToken" placeholder="passcode" autocomplete="off" autocapitalize="off">
+  <button class="primary" style="width:100%;margin-top:12px" onclick="Sync.testAndSave()">Test &amp; save</button>
+  <div class="status" id="setupStatus" style="margin-top:10px"></div>
+  <div id="shareBox" hidden style="margin-top:12px">
+    <div class="label">Setup link for other devices</div>
+    <p class="small muted" style="margin:0 0 6px">Open this link once on a phone or laptop and it configures itself.</p>
+    <input type="text" id="shareLink" readonly onclick="this.select()">
+    <button class="small" style="width:100%;margin-top:6px" onclick="UI.copyShareLink()">Copy link</button>
+  </div>
+  <div class="label" style="margin-top:14px">Queue</div>
+  <div class="small muted" id="queueInfo"></div>
+  <div class="row" style="margin-top:8px">
+    <button class="ghost small" onclick="Sync.flush(true)">Retry now</button>
+    <button class="ghost small danger" onclick="UI.clearQueue()">Discard queue</button>
+  </div>
+  <button class="small" style="width:100%;margin-top:8px" id="resendBtn" onclick="Sync.resendGame()">Send this game / practice to the sheet again</button>
+  <button class="ghost" style="width:100%;margin-top:12px" onclick="UI.closeSheets()">Close</button>
+</div>
+
+<div class="sheet" id="rosterSheet">
+  <h2>Roster (jersey numbers)</h2>
+  <p class="small muted" style="margin:0 0 8px">Comma-separated. These must match the numbers in column A of the workbook.</p>
+  <input type="text" id="rosterInput" inputmode="numeric" autocomplete="off">
+  <div class="row" style="margin-top:12px">
+    <button class="primary" onclick="UI.saveRoster()">Save</button>
+    <button class="ghost" onclick="UI.closeSheets()">Cancel</button>
+  </div>
+</div>
+
+<div class="sheet" id="confirmSheet">
+  <h2 id="confirmTitle">Are you sure?</h2>
+  <p id="confirmBody" class="small muted"></p>
+  <div class="row">
+    <button class="danger" id="confirmYes">Yes</button>
+    <button class="ghost" onclick="UI.closeSheets()">Cancel</button>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* ======================================================================
+   STATE
+   ====================================================================== */
+const KEY = 'mvbstats.v1';
+const DEFAULT_ROSTER = [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,33];
+
+const State = {
+  data: null,
+  load() {
+    try { this.data = JSON.parse(localStorage.getItem(KEY)); } catch (e) { this.data = null; }
+    if (!this.data || !Array.isArray(this.data.games)) this.data = { roster: DEFAULT_ROSTER.slice(), games: [], activeId: null, queue: [] };
+    if (!Array.isArray(this.data.queue)) this.data.queue = [];
+    if (!this.data.roster || !this.data.roster.length) this.data.roster = DEFAULT_ROSTER.slice();
+  },
+  save() { try { localStorage.setItem(KEY, JSON.stringify(this.data)); } catch (e) { UI.toast('Could not save (storage blocked)'); } },
+  game() { return this.data.games.find(g => g.id === this.data.activeId) || null; }
+};
+
+/* ======================================================================
+   UI
+   ====================================================================== */
+const UI = {
+  pending: null, // player selected for grading
+  subOut: null,
+
+  init() {
+    State.load();
+    document.getElementById('newDate').value = todayISO();
+    this.setKind('game');
+    this.renderHome();
+    [0,1,2,3,4].forEach(g => {
+      document.getElementById('serveGrades').appendChild(gradeBtn(g, () => UI.record('S', g)));
+      document.getElementById('passGrades').appendChild(gradeBtn(g, () => UI.record('P', g)));
+    });
+    if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
+    Sync.init();
+    const g = State.game();
+    if (g) this.openGame(g.id); else { this.show('home'); Sync.pullSessions(); }
+  },
+
+  show(id) {
+    document.querySelectorAll('.screen').forEach(s => s.classList.toggle('active', s.id === id));
+    window.scrollTo(0, 0);
+  },
+
+  toast(msg) {
+    const t = document.getElementById('toast');
+    t.textContent = msg; t.classList.add('show');
+    clearTimeout(t._h); t._h = setTimeout(() => t.classList.remove('show'), 1400);
+  },
+
+  openSheet(id) {
+    document.getElementById('sheetBg').classList.add('open');
+    document.getElementById(id).classList.add('open');
+  },
+  closeSheets() {
+    document.getElementById('sheetBg').classList.remove('open');
+    document.querySelectorAll('.sheet').forEach(s => s.classList.remove('open'));
+    this.pending = null; this.subOut = null;
+  },
+
+  /* ---------- home ---------- */
+  renderHome() {
+    const list = document.getElementById('gameList');
+    list.innerHTML = '';
+    const games = State.data.games.slice().sort((a, b) => (b.date || '').localeCompare(a.date || '') || b.created - a.created);
+    if (!games.length) list.innerHTML = '<p class="muted small">Nothing recorded yet.</p>';
+    for (const g of games) {
+      const row = document.createElement('div'); row.className = 'item';
+      const b = document.createElement('button');
+      const n = g.events.length || g.remoteEntries || 0;
+      b.innerHTML = `<span><b>${esc(gameTitle(g))}</b><br><span class="small muted">${fmtDate(g.date)} · ${g.sets.length} ${setWord(g)}${g.sets.length === 1 ? '' : 's'} · ${n} entr${n === 1 ? 'y' : 'ies'}${g.ended ? ' · Final' : ''}</span></span><span class="muted">&#8250;</span>`;
+      b.onclick = () => UI.openGame(g.id);
+      const t = document.createElement('button'); t.className = 'trash'; t.title = 'Delete'; t.setAttribute('aria-label', 'Delete');
+      t.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/></svg>';
+      t.onclick = () => UI.deleteGame(g.id);
+      row.appendChild(b); row.appendChild(t); list.appendChild(row);
+    }
+  },
+  kind: 'game',
+  setKind(k) {
+    this.kind = k;
+    document.getElementById('kindGame').className = k === 'game' ? 'primary' : '';
+    document.getElementById('kindPractice').className = k === 'practice' ? 'primary' : '';
+    document.getElementById('oppRow').hidden = k === 'practice';
+    document.getElementById('newHome').hidden = k === 'practice';
+    document.getElementById('startBtn').textContent = k === 'practice' ? 'Start practice' : 'Start game';
+  },
+  toggleHome() {
+    const b = document.getElementById('newHome');
+    b.dataset.away = b.dataset.away === '1' ? '0' : '1';
+    b.textContent = b.dataset.away === '1' ? 'Away' : 'Home';
+  },
+  newGame() {
+    const practice = this.kind === 'practice';
+    const opp = practice ? 'Practice' : document.getElementById('newOpp').value.trim();
+    if (!opp) { this.toast('Enter the opponent'); return; }
+    const g = {
+      id: 'g' + Date.now().toString(36),
+      kind: practice ? 'practice' : 'game',
+      opp, date: document.getElementById('newDate').value || todayISO(),
+      home: practice ? true : document.getElementById('newHome').dataset.away !== '1',
+      created: Date.now(),
+      sets: [{ n: 1, lineup: [] }],
+      cur: 0,
+      events: []
+    };
+    State.data.games.push(g);
+    Sync.enqueue({ kind: 'start', sid: g.id });
+    document.getElementById('newOpp').value = '';
+    this.openGame(g.id);
+  },
+  openGame(id) {
+    State.data.activeId = id; State.save();
+    this.show('game');
+    this.renderGame();
+    const g = State.game();
+    if (g && g.remote && !g.events.length) Sync.pullEvents(g);
+  },
+  goHome() {
+    this.closeSheets();
+    State.data.activeId = null; State.save();
+    this.renderHome(); this.show('home');
+    Sync.pullSessions();
+  },
+  confirm(title, body, fn) {
+    document.getElementById('confirmTitle').textContent = title;
+    document.getElementById('confirmBody').textContent = body;
+    document.getElementById('confirmYes').onclick = () => { this.closeSheets(); fn(); };
+    this.openSheet('confirmSheet');
+  },
+  deleteGame(id) {
+    const g = State.data.games.find(x => x.id === id);
+    this.confirm(isPractice(g) ? 'Delete this practice?' : 'Delete this game?', `${gameTitle(g)} on ${fmtDate(g.date)} — ${g.events.length} entries. Its tab, log rows and Face Page totals are removed from the workbook too. This cannot be undone.`, () => {
+      State.data.games = State.data.games.filter(x => x.id !== id);
+      State.data.queue = State.data.queue.filter(q => q.sid !== id);
+      State.data.queue.push({ kind: 'delete', sid: id, session: { id: g.id, kind: g.kind || 'game' } });
+      if (State.data.activeId === id) State.data.activeId = null;
+      State.save(); this.goHome(); Sync.flush();
+      this.toast(isPractice(g) ? 'Practice deleted' : 'Game deleted');
+    });
+  },
+
+  /* ---------- roster ---------- */
+  openRoster() {
+    document.getElementById('rosterInput').value = State.data.roster.join(', ');
+    this.openSheet('rosterSheet');
+  },
+  saveRoster() {
+    const nums = document.getElementById('rosterInput').value.split(/[^0-9]+/).filter(Boolean).map(Number);
+    const uniq = [...new Set(nums)].sort((a, b) => a - b);
+    if (!uniq.length) { this.toast('Enter at least one number'); return; }
+    State.data.roster = uniq; State.save();
+    this.closeSheets(); this.toast('Roster saved');
+  },
+
+  /* ---------- game screen ---------- */
+  renderGame() {
+    const g = State.game(); if (!g) return this.goHome();
+    const set = g.sets[g.cur];
+    document.getElementById('gTitle').innerHTML = `${esc(gameTitle(g))}<br><span class="sub">${fmtDate(g.date)} · ${g.events.length} entries</span>`;
+    document.getElementById('gSet').textContent = cap(setWord(g)) + ' ' + set.n;
+    document.getElementById('newSetBtn').textContent = 'New ' + setWord(g);
+    const ended = !!g.ended;
+    const needLineup = !ended && (!set.lineup.length || this._editing);
+    document.getElementById('lineupPanel').hidden = !needLineup;
+    document.getElementById('playPanel').hidden = ended || needLineup;
+    document.getElementById('finalPanel').hidden = !ended;
+    document.querySelectorAll('#game .topbar + .row > button:not(.pill)').forEach(b => b.disabled = ended);
+    document.getElementById('endBtn').textContent = isPractice(g) ? 'End practice' : 'End game';
+    if (ended) {
+      document.getElementById('finalText').textContent = `${g.events.length} entries over ${g.sets.length} ${setWord(g)}${g.sets.length === 1 ? '' : 's'}. Everything is on the sheet; reopen only if you need to add or undo something.`;
+      document.getElementById('finalTotals').innerHTML = Stats.table(g);
+    } else if (needLineup) this.renderLineup(); else this.renderCourt();
+  },
+  renderLineup() {
+    const g = State.game(), set = g.sets[g.cur];
+    const grid = document.getElementById('lineupGrid'); grid.innerHTML = '';
+    const selected = new Set(this._lineupDraft || (set.lineup.length ? set.lineup : (isPractice(g) && g.cur === 0 ? State.data.roster : [])));
+    this._lineupDraft = [...selected];
+    for (const n of State.data.roster) {
+      const b = document.createElement('button');
+      b.textContent = n; b.className = selected.has(n) ? 'sel' : '';
+      b.onclick = () => {
+        const i = this._lineupDraft.indexOf(n);
+        if (i >= 0) this._lineupDraft.splice(i, 1); else this._lineupDraft.push(n);
+        this.renderLineup();
+      };
+      grid.appendChild(b);
+    }
+    document.getElementById('lineupLabel').textContent = isPractice(g) ? `Round ${set.n} — who is in this drill? (${this._lineupDraft.length} selected)` : `Set ${set.n} — who is on the court? (${this._lineupDraft.length} selected, include the libero)`;
+    document.getElementById('lineupStart').disabled = !this._lineupDraft.length;
+    document.getElementById('lineupStart').textContent = 'Start ' + setWord(g);
+  },
+  startSet() {
+    const g = State.game(), set = g.sets[g.cur];
+    set.lineup = (this._lineupDraft || []).slice().sort((a, b) => a - b);
+    this._lineupDraft = null; this._editing = false;
+    State.save(); this.renderGame();
+  },
+  endGame() {
+    const g = State.game(); if (!g) return;
+    this.confirm(isPractice(g) ? 'End this practice?' : 'End this game?', `${g.events.length} entries over ${g.sets.length} ${setWord(g)}${g.sets.length === 1 ? '' : 's'}. You can reopen it later if something was missed.`, () => {
+      g.ended = true; State.save();
+      Sync.enqueue({ kind: 'sets', sid: g.id });
+      this.renderGame();
+      this.toast(isPractice(g) ? 'Practice ended' : 'Game ended');
+    });
+  },
+  reopenGame() {
+    const g = State.game(); if (!g) return;
+    g.ended = false; State.save();
+    Sync.enqueue({ kind: 'sets', sid: g.id });
+    this.renderGame();
+  },
+  editLineup() { this._editing = true; this._lineupDraft = null; this.renderGame(); },
+  newSet() {
+    const g = State.game();
+    const prev = g.sets[g.cur];
+    this.confirm(`Start ${setWord(g)} ${prev.n + 1}?`, 'The current lineup is carried over; you can adjust it before play starts.', () => {
+      g.sets.push({ n: prev.n + 1, lineup: [] });
+      g.cur = g.sets.length - 1;
+      Sync.enqueue({ kind: 'sets', sid: g.id });
+      this._lineupDraft = prev.lineup.slice();
+      State.save(); this.renderGame();
+    });
+  },
+  renderCourt() {
+    const g = State.game(), set = g.sets[g.cur];
+    const grid = document.getElementById('courtGrid'); grid.innerHTML = '';
+    const stats = Stats.perPlayer(g);
+    for (const n of set.lineup) {
+      const b = document.createElement('button');
+      const s = stats[n] || { S: [], P: [] };
+      b.innerHTML = `${n}<small>S ${s.S.length} · P ${s.P.length}</small>`;
+      b.onclick = () => UI.pick(n);
+      grid.appendChild(b);
+    }
+    document.getElementById('undoBtn').disabled = !g.events.length;
+    // recent log
+    const log = document.getElementById('log'); log.innerHTML = '';
+    const recent = g.events.slice(-12).reverse();
+    if (!recent.length) log.innerHTML = '<span class="muted small">Nothing recorded yet.</span>';
+    for (const e of recent) {
+      const c = document.createElement('span'); c.className = 'chip';
+      c.innerHTML = `<b>#${e.p}</b> ${e.t === 'S' ? 'serve' : 'pass'} <b style="color:var(--g${e.g})">${e.g}</b> <span class="muted">S${e.s}</span>`;
+      log.appendChild(c);
+    }
+    document.getElementById('totals').innerHTML = Stats.table(g);
+  },
+  pick(n) {
+    this.pending = n;
+    document.getElementById('gradeTitle').textContent = '#' + n;
+    this.openSheet('gradeSheet');
+  },
+  record(type, grade) {
+    const g = State.game(); if (!g || this.pending == null || g.ended) return;
+    const set = g.sets[g.cur];
+    const ev = { id: newId(), s: set.n, p: this.pending, t: type, g: grade, ts: Date.now() };
+    g.events.push(ev);
+    Sync.enqueue({ kind: 'entry', sid: g.id, entry: ev });
+    State.save();
+    const who = this.pending;
+    this.closeSheets();
+    this.renderGame();
+    this.toast(`#${who} ${type === 'S' ? 'serve' : 'pass'} ${grade}`);
+  },
+  undo() {
+    const g = State.game(); if (!g || !g.events.length) return;
+    const e = g.events.pop();
+    Sync.undo(g.id, e);
+    State.save(); this.renderGame();
+    this.toast(`Removed #${e.p} ${e.t === 'S' ? 'serve' : 'pass'} ${e.g}`);
+  },
+
+  /* ---------- substitutions ---------- */
+  openSub() {
+    const g = State.game(), set = g.sets[g.cur];
+    if (!set.lineup.length) { this.toast('Set the lineup first'); return; }
+    this.subOut = null;
+    this.renderSub();
+    this.openSheet('subSheet');
+  },
+  renderSub() {
+    const g = State.game(), set = g.sets[g.cur];
+    const grid = document.getElementById('subGrid'); grid.innerHTML = '';
+    const title = document.getElementById('subTitle');
+    if (this.subOut == null) {
+      title.textContent = isPractice(g) ? 'Who is leaving the drill?' : 'Who is going out?';
+      for (const n of set.lineup) {
+        const b = document.createElement('button'); b.textContent = n;
+        b.onclick = () => { UI.subOut = n; UI.renderSub(); };
+        grid.appendChild(b);
+      }
+    } else {
+      title.textContent = `#${this.subOut} out — who is coming in?`;
+      const bench = State.data.roster.filter(n => !set.lineup.includes(n));
+      if (!bench.length) grid.innerHTML = '<p class="muted small">Everyone on the roster is already on the court.</p>';
+      for (const n of bench) {
+        const b = document.createElement('button'); b.textContent = n;
+        b.onclick = () => UI.doSub(UI.subOut, n);
+        grid.appendChild(b);
+      }
+    }
+  },
+  doSub(out, inn) {
+    const g = State.game(), set = g.sets[g.cur];
+    set.lineup = set.lineup.filter(n => n !== out).concat([inn]).sort((a, b) => a - b);
+    State.save(); this.closeSheets(); this.renderGame();
+    this.toast(`#${inn} in for #${out}`);
+  },
+
+  /* ---------- sync setup ---------- */
+  openSetup() {
+    document.getElementById('syncUrl').value = Sync.cfg.url || '';
+    document.getElementById('syncToken').value = Sync.cfg.token || '';
+    document.getElementById('setupStatus').textContent = '';
+    document.getElementById('setupStatus').className = 'status';
+    Sync.renderQueueInfo();
+    Sync.renderShare();
+    document.getElementById('resendBtn').hidden = !State.game() || !Sync.configured();
+    this.openSheet('setupSheet');
+  },
+  copyShareLink() {
+    const el = document.getElementById('shareLink');
+    const done = () => this.toast('Link copied');
+    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(el.value).then(done).catch(() => { el.select(); this.toast('Press copy'); });
+    else { el.select(); this.toast('Press copy'); }
+  },
+  clearQueue() {
+    this.confirm('Discard queued entries?', `${State.data.queue.length} unsent item(s) will be dropped. The stats stay on this device but will not reach the sheet.`, () => {
+      State.data.queue = []; State.save(); Sync.render(); this.toast('Queue cleared');
+    });
+  }
+};
+
+function isPractice(g) { return g && g.kind === 'practice'; }
+function gameTitle(g) { return isPractice(g) ? 'Practice' : (g.home ? 'vs ' : 'at ') + g.opp; }
+function setWord(g) { return isPractice(g) ? 'round' : 'set'; }
+function cap(s) { return s.charAt(0).toUpperCase() + s.slice(1); }
+function newId() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
+function gradeBtn(g, fn) { const b = document.createElement('button'); b.className = 'g' + g; b.textContent = g; b.onclick = fn; return b; }
+function esc(s) { return String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])); }
+function todayISO() { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
+function fmtDate(iso) { if (!iso) return ''; const [y, m, d] = iso.split('-').map(Number); return ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][m - 1] + ' ' + d; }
+
+/* ======================================================================
+   STATS (mirrors the workbook formulas)
+   ====================================================================== */
+const Stats = {
+  perPlayer(g) {
+    const out = {};
+    for (const e of g.events) { (out[e.p] = out[e.p] || { S: [], P: [] })[e.t].push(e.g); }
+    return out;
+  },
+  summary(grades) {
+    const n = grades.length; if (!n) return null;
+    const c = [0,0,0,0,0]; grades.forEach(x => c[x]++);
+    const pts = c[1] + 2*c[2] + 3*c[3] + 4*c[4];
+    return { n, c, pts, real: pts / (4*n), inRatio: (n - c[0]) / n, aces: c[4] / n, errs: c[0] / n };
+  },
+  table(g) {
+    const per = this.perPlayer(g);
+    const nums = Object.keys(per).map(Number).sort((a, b) => a - b);
+    if (!nums.length) return '<p class="muted small">No entries yet.</p>';
+    let h = '<table><tr><th>#</th><th>Serves</th><th>S %</th><th>Aces</th><th>Err</th><th>Passes</th><th>P %</th><th>SR %</th></tr>';
+    for (const n of nums) {
+      const s = this.summary(per[n].S), p = this.summary(per[n].P);
+      h += `<tr><td><b>${n}</b></td><td>${s ? s.n : ''}</td><td>${s ? pct(s.real) : ''}</td><td>${s ? s.c[4] : ''}</td><td>${s ? s.c[0] : ''}</td><td>${p ? p.n : ''}</td><td>${p ? pct(p.real) : ''}</td><td>${p ? pct(p.inRatio) : ''}</td></tr>`;
+    }
+    return h + '</table>';
+  }
+};
+function pct(x) { return (x * 100).toFixed(0) + '%'; }
+
+/* ======================================================================
+   SYNC — sends every entry to the Google Apps Script backend
+   Queue lives in State.data.queue and survives reloads. Items are sent in
+   order; consecutive entries for the same session are batched.
+   ====================================================================== */
+const SYNC_KEY = 'mvbstats.sync';
+const Sync = {
+  cfg: { url: '', token: '' },
+  busy: false, timer: null, backoff: 0, lastError: '',
+
+  init() {
+    try { Object.assign(this.cfg, JSON.parse(localStorage.getItem(SYNC_KEY) || '{}')); } catch (e) {}
+    // A setup link (#cfg=…) configures this device once, then is removed from the address bar.
+    try {
+      const m = location.hash.match(/^#cfg=([A-Za-z0-9\-_]+)/);
+      if (m) {
+        const c = JSON.parse(atob(m[1].replace(/-/g, '+').replace(/_/g, '/')));
+        if (c && c.url) { this.cfg = { url: c.url, token: c.token || '' }; this.saveCfg(); UI.toast('Connected to the team sheet'); }
+        history.replaceState(null, '', location.pathname + location.search);
+      }
+    } catch (e) {}
+    State.data.games.forEach(g => g.events.forEach(ev => { if (!ev.id) ev.id = newId(); }));
+    window.addEventListener('online', () => this.flush());
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) this.flush(); });
+    this.render();
+    this.flush();
+  },
+  saveCfg() { try { localStorage.setItem(SYNC_KEY, JSON.stringify(this.cfg)); } catch (e) {} },
+  configured() { return /^https:\/\/script\.google(usercontent)?\.com\//.test(this.cfg.url || ''); },
+
+  sessionPayload(sid) {
+    const g = State.data.games.find(x => x.id === sid);
+    if (!g) return null;
+    return { id: g.id, kind: g.kind || 'game', date: g.date, opp: g.opp, home: !!g.home, sets: g.sets.length, ended: !!g.ended };
+  },
+
+  enqueue(item) {
+    State.data.queue.push(item);
+    State.save();
+    this.render();
+    this.flush();
+  },
+
+  /* Undo: if the entry has not been sent yet, just drop it from the queue; otherwise ask the sheet to remove it. */
+  undo(sid, ev) {
+    const q = State.data.queue;
+    const i = q.findIndex(x => x.kind === 'entry' && x.sid === sid && x.entry.id === ev.id);
+    if (i >= 0) q.splice(i, 1); else q.push({ kind: 'undo', sid, entryId: ev.id });
+    State.save(); this.render(); this.flush();
+  },
+
+  async post(body) {
+    const res = await fetch(this.cfg.url, {
+      method: 'POST', redirect: 'follow',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },   // text/plain avoids a CORS preflight that Apps Script cannot answer
+      body: JSON.stringify(Object.assign({ token: this.cfg.token }, body))
+    });
+    const text = await res.text();
+    let data; try { data = JSON.parse(text); } catch (e) { throw new Error('Unexpected reply from the script (is the deployment set to "Anyone"?)'); }
+    if (!data.ok) { const err = new Error(data.error || 'script error'); err.retry = !!data.retry; err.fatal = /passcode|unknown action|bad JSON/.test(data.error || ''); throw err; }
+    return data;
+  },
+
+  /* Send the head of the queue. Returns when the queue is empty or an error stops it. */
+  async flush(force) {
+    if (this.busy || !this.configured() || !State.data.queue.length) { this.render(); return; }
+    if (force) { clearTimeout(this.timer); this.backoff = 0; }
+    this.busy = true; this.render();
+    try {
+      while (State.data.queue.length) {
+        const q = State.data.queue;
+        const head = q[0];
+        let body, consumed = 1;
+        if (head.kind === 'entry') {
+          const batch = [];
+          while (batch.length < 40 && q[batch.length] && q[batch.length].kind === 'entry' && q[batch.length].sid === head.sid) batch.push(q[batch.length].entry);
+          consumed = batch.length;
+          body = { action: 'entries', session: this.sessionPayload(head.sid), entries: batch.map(e => ({ id: e.id, set: e.s, player: e.p, type: e.t, grade: e.g, ts: e.ts })) };
+        } else if (head.kind === 'start') {
+          body = { action: 'startSession', session: this.sessionPayload(head.sid) };
+        } else if (head.kind === 'sets') {
+          body = { action: 'sets', session: this.sessionPayload(head.sid) };
+        } else if (head.kind === 'undo') {
+          body = { action: 'undo', session: this.sessionPayload(head.sid), entryId: head.entryId };
+        } else if (head.kind === 'delete') {
+          body = { action: 'deleteSession', session: head.session };
+        }
+        if (!body || !body.session) { q.splice(0, consumed); State.save(); continue; }   // game was deleted locally
+        const data = await this.post(body);
+        if (data.skipped && data.skipped.length) UI.toast(data.skipped[0]);
+        q.splice(0, consumed); State.save();
+        this.lastError = ''; this.backoff = 0;
+        this.render();
+      }
+    } catch (e) {
+      this.lastError = e.message || String(e);
+      if (!e.fatal) {
+        this.backoff = Math.min((this.backoff || 2000) * 2, 60000);
+        clearTimeout(this.timer); this.timer = setTimeout(() => this.flush(), this.backoff);
+      }
+    } finally {
+      this.busy = false; this.render();
+    }
+  },
+
+  async testAndSave() {
+    const url = document.getElementById('syncUrl').value.trim();
+    const token = document.getElementById('syncToken').value.trim();
+    const st = document.getElementById('setupStatus');
+    st.className = 'status'; st.textContent = 'Testing…';
+    const old = Object.assign({}, this.cfg);
+    this.cfg = { url, token };
+    try {
+      if (!this.configured()) throw new Error('That does not look like an Apps Script web app URL (it should start with https://script.google.com/macros/s/ and end in /exec).');
+      const data = await this.post({ action: 'roster' });
+      const nums = (data.roster || []).map(r => Number(r.n)).filter(n => n > 0);
+      if (nums.length) { State.data.roster = nums; State.save(); }
+      this.saveCfg(); this.lastError = ''; this.backoff = 0;
+      st.className = 'status ok'; st.textContent = `Connected. Roster loaded from the sheet (${nums.length} players).`;
+      this.render(); this.renderShare(); document.getElementById('resendBtn').hidden = !State.game(); this.flush(true);
+    } catch (e) {
+      this.cfg = old;
+      st.className = 'status err'; st.textContent = 'Could not connect: ' + (e.message || e);
+    }
+  },
+
+  render() {
+    const n = State.data.queue.length;
+    let cls = '', text = 'Not set up';
+    if (this.configured()) {
+      if (this.lastError) { const short = /fetch|network|load failed/i.test(this.lastError) ? 'offline' : (this.lastError.length > 24 ? 'error' : this.lastError); cls = 'err'; text = n ? `${n} waiting · ${short}` : 'Error'; }
+      else if (n) { cls = 'pending'; text = this.busy ? `Sending ${n}…` : `${n} pending`; }
+      else { cls = 'live'; text = 'Live'; }
+    }
+    for (const id of ['syncPillHome', 'syncPillGame']) { const el = document.getElementById(id); if (el) { el.className = 'pill ' + cls; el.textContent = text; } }
+    this.renderQueueInfo();
+  },
+  /* Sessions that exist in the workbooks but not on this device (started elsewhere, or selfTest) are added to the list. */
+  async pullSessions() {
+    if (!this.configured() || this._pulling) return;
+    this._pulling = true;
+    try {
+      const data = await this.post({ action: 'sessions' });
+      let changed = false;
+      for (const r of data.sessions || []) {
+        let g = State.data.games.find(x => x.id === r.id);
+        if (!g) {
+          g = { id: r.id, kind: r.kind, opp: r.kind === 'practice' ? 'Practice' : (r.opp || '?'), date: r.date || todayISO(), home: !!r.home, created: Date.now(),
+                sets: Array.from({ length: Math.max(1, r.sets) }, (_, i) => ({ n: i + 1, lineup: [] })), cur: Math.max(1, r.sets) - 1, events: [], remote: true, remoteEntries: r.entries, ended: !!r.ended };
+          State.data.games.push(g); changed = true;
+        } else if (g.remote) {
+          if (g.remoteEntries !== r.entries || g.ended !== !!r.ended) { g.remoteEntries = r.entries; g.ended = !!r.ended; changed = true; }
+        }
+      }
+      if (changed) { State.save(); if (document.getElementById('home').classList.contains('active')) UI.renderHome(); }
+    } catch (e) { /* offline or not deployed yet; the list just shows local games */ }
+    finally { this._pulling = false; }
+  },
+  async pullEvents(g) {
+    try {
+      const data = await this.post({ action: 'events', session: { id: g.id, kind: g.kind } });
+      const evs = (data.events || []).map(e => ({ id: e.id, s: e.set, p: e.player, t: e.type, g: e.grade, ts: e.ts }));
+      if (!g.events.length) { g.events = evs; g.remoteEntries = evs.length; State.save(); if (State.game() === g) UI.renderGame(); }
+    } catch (e) { UI.toast('Could not load entries from the sheet'); }
+  },
+  renderQueueInfo() {
+    const el = document.getElementById('queueInfo'); if (!el) return;
+    const n = State.data.queue.length;
+    el.textContent = !this.configured() ? (n ? `${n} item(s) will send once the connection is set up.` : 'Not connected yet.')
+      : (n ? `${n} item(s) waiting to send.` : 'Nothing waiting; everything is on the sheet.') + (this.lastError ? ` Last error: ${this.lastError}` : '');
+  },
+  shareLink() {
+    const b = btoa(JSON.stringify({ url: this.cfg.url, token: this.cfg.token })).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+    return location.origin + location.pathname + '#cfg=' + b;
+  },
+  renderShare() {
+    const box = document.getElementById('shareBox'); if (!box) return;
+    box.hidden = !this.configured();
+    if (this.configured()) document.getElementById('shareLink').value = this.shareLink();
+  },
+  /* Re-queue a whole game (e.g. one recorded before the connection was set up). The sheet ignores entries it already has. */
+  resendGame() {
+    const g = State.game(); if (!g) return;
+    State.data.queue = State.data.queue.filter(q => q.sid !== g.id);
+    State.data.queue.push({ kind: 'start', sid: g.id });
+    g.events.forEach(ev => State.data.queue.push({ kind: 'entry', sid: g.id, entry: ev }));
+    State.data.queue.push({ kind: 'sets', sid: g.id });
+    State.save(); this.render(); this.flush(true);
+    UI.toast(`Sending ${g.events.length} entries`);
+  }
+};
+
+
+
+
+window.App = { State, UI, Stats, Sync };
+UI.init();
+</script>
+</body>
+</html>
