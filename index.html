@@ -237,6 +237,7 @@ const State = {
     try { this.data = JSON.parse(localStorage.getItem(KEY)); } catch (e) { this.data = null; }
     if (!this.data || !Array.isArray(this.data.games)) this.data = { roster: DEFAULT_ROSTER.slice(), games: [], activeId: null, queue: [] };
     if (!Array.isArray(this.data.queue)) this.data.queue = [];
+    if (!Array.isArray(this.data.deleted)) this.data.deleted = [];
     if (!this.data.roster || !this.data.roster.length) this.data.roster = DEFAULT_ROSTER.slice();
   },
   save() { try { localStorage.setItem(KEY, JSON.stringify(this.data)); } catch (e) { UI.toast('Could not save (storage blocked)'); } },
@@ -362,6 +363,7 @@ const UI = {
       State.data.games = State.data.games.filter(x => x.id !== id);
       State.data.queue = State.data.queue.filter(q => q.sid !== id);
       State.data.queue.push({ kind: 'delete', sid: id, session: { id: g.id, kind: g.kind || 'game' } });
+      State.data.deleted = State.data.deleted.filter(x => x !== id).concat([id]).slice(-300);
       if (State.data.activeId === id) State.data.activeId = null;
       State.save(); this.goHome(); Sync.flush();
       this.toast(isPractice(g) ? 'Practice deleted' : 'Game deleted');
@@ -690,6 +692,7 @@ const Sync = {
         if (!body || !body.session) { q.splice(0, consumed); State.save(); continue; }   // game was deleted locally
         const data = await this.post(body);
         if (data.skipped && data.skipped.length) UI.toast(data.skipped[0]);
+        if (head.kind === 'delete') setTimeout(() => this.pullSessions(), 500);
         q.splice(0, consumed); State.save();
         this.lastError = ''; this.backoff = 0;
         this.render();
@@ -744,7 +747,11 @@ const Sync = {
     try {
       const data = await this.post({ action: 'sessions' });
       let changed = false;
+      const pendingDelete = new Set(State.data.queue.filter(q => q.kind === 'delete').map(q => q.sid));
+      const tomb = new Set(State.data.deleted);
+      const remoteIds = new Set((data.sessions || []).map(r => r.id));
       for (const r of data.sessions || []) {
+        if (tomb.has(r.id) || pendingDelete.has(r.id)) continue;   // deleted here; the sheet just hasn't caught up
         let g = State.data.games.find(x => x.id === r.id);
         if (!g) {
           g = { id: r.id, kind: r.kind, opp: r.kind === 'practice' ? 'Practice' : (r.opp || '?'), date: r.date || todayISO(), home: !!r.home, created: Date.now(),
@@ -753,6 +760,12 @@ const Sync = {
         } else if (g.remote) {
           if (g.remoteEntries !== r.entries || g.ended !== !!r.ended) { g.remoteEntries = r.entries; g.ended = !!r.ended; changed = true; }
         }
+      }
+      // A session that only ever came from the sheet, and is gone from the sheet, was deleted on another device.
+      if (!pendingDelete.size) {
+        const before = State.data.games.length;
+        State.data.games = State.data.games.filter(g => !(g.remote && !remoteIds.has(g.id)));
+        if (State.data.games.length !== before) changed = true;
       }
       if (changed) { State.save(); if (document.getElementById('home').classList.contains('active')) UI.renderHome(); }
     } catch (e) { /* offline or not deployed yet; the list just shows local games */ }
