@@ -58,7 +58,9 @@ function doPost(e) {
     out.ok = true;
     return json_(out);
   } catch (err) {
-    return json_({ ok: false, error: String(err && err.message || err) + ' [' + body.action + (body.session ? ' ' + body.session.kind : '') + ']' });
+    var msg = String(err && err.message || err) + ' [' + body.action + (body.session ? ' ' + body.session.kind : '') + ']';
+    console.error(msg + ' session=' + (body.session && body.session.id) + ' ' + (err && err.stack || ''));
+    return json_({ ok: false, error: msg });
   } finally {
     lock.releaseLock();
   }
@@ -164,8 +166,8 @@ function startSession_(ss, s) {
 }
 
 function updateSets_(ss, s) {
-  var row = findSessionRow_(ss, s.id);
-  if (!row) throw new Error('unknown session');
+  var row = findSessionRow_(ss, s && s.id);
+  if (!row) { startSession_(ss, s); row = findSessionRow_(ss, s.id); }   // its start never arrived, or it was removed: recreate
   var se = ss.getSheetByName(TAB.SESSIONS);
   se.getRange(row.row, SESSION_COLS.sets).setValue(s.sets || 1);
   se.getRange(row.row, SESSION_COLS.updated).setValue(new Date());
@@ -352,8 +354,7 @@ function bumpSession_(ss, row, session) {
 /** Rewrite the attempt cells (C..AZ) for the given "type:player" keys from the Log, in log order. */
 function rebuildRows_(ss, tab, keys) {
   if (!keys.length) return [];
-  var sh = ss.getSheetByName(tab);
-  if (!sh) throw new Error('tab "' + tab + '" not found');
+  var sh = ss.getSheetByName(tab) || recreateTab_(ss, tab);
   var blocks = blocks_(sh);                     // [passing, serving] -> { jersey: row }
   var log = ss.getSheetByName(TAB.LOG);
   var n = log.getLastRow();
@@ -374,6 +375,17 @@ function rebuildRows_(ss, tab, keys) {
     sh.getRange(row, FIRST_ATTEMPT_COL, 1, MAX_ATTEMPTS).setValues([vals]);
   });
   return skipped;
+}
+
+/** A tab listed in Sessions but deleted by hand: copy the Template back under the same name and re-add it to the Face Page. */
+function recreateTab_(ss, tab) {
+  var tpl = ss.getSheetByName(TAB.TEMPLATE);
+  if (!tpl) throw new Error('Template tab is missing');
+  var sh = tpl.copyTo(ss).setName(tab);
+  sh.showSheet();
+  sh.getRange(60, 1).setValue('Recreated by the stats app from the Log');
+  extendFacePage_(ss, tab);
+  return sh;
 }
 
 /** Find the PASSING and SERVING blocks by their '#' header rows; map jersey -> row. */

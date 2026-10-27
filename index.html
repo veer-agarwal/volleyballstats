@@ -199,6 +199,7 @@ details summary{cursor:pointer;color:var(--muted);font-size:14px;min-height:40px
     <button class="ghost small" onclick="Sync.flush(true)">Retry now</button>
     <button class="ghost small danger" onclick="UI.clearQueue()">Discard queue</button>
   </div>
+  <button class="small" style="width:100%;margin-top:8px" id="retryParkedBtn" hidden onclick="Sync.retryParked()">Retry set-aside items</button>
   <button class="small" style="width:100%;margin-top:8px" id="resendBtn" onclick="Sync.resendGame()">Send this game / practice to the sheet again</button>
   <button class="ghost" style="width:100%;margin-top:12px" onclick="UI.closeSheets()">Close</button>
 </div>
@@ -238,6 +239,7 @@ const State = {
     if (!this.data || !Array.isArray(this.data.games)) this.data = { roster: DEFAULT_ROSTER.slice(), games: [], activeId: null, queue: [] };
     if (!Array.isArray(this.data.queue)) this.data.queue = [];
     if (!Array.isArray(this.data.deleted)) this.data.deleted = [];
+    if (!Array.isArray(this.data.parked)) this.data.parked = [];
     if (!this.data.roster || !this.data.roster.length) this.data.roster = DEFAULT_ROSTER.slice();
   },
   save() { try { localStorage.setItem(KEY, JSON.stringify(this.data)); } catch (e) { UI.toast('Could not save (storage blocked)'); } },
@@ -661,7 +663,7 @@ const Sync = {
     });
     const text = await res.text();
     let data; try { data = JSON.parse(text); } catch (e) { throw new Error('Unexpected reply from the script (is the deployment set to "Anyone"?)'); }
-    if (!data.ok) { const err = new Error(data.error || 'script error'); err.retry = !!data.retry; err.fatal = /passcode|unknown action|bad JSON/.test(data.error || ''); throw err; }
+    if (!data.ok) { const err = new Error(data.error || 'script error'); err.script = !data.retry; err.retry = !!data.retry; err.fatal = /passcode|unknown action|bad JSON/.test(data.error || ''); throw err; }
     return data;
   },
 
@@ -690,7 +692,17 @@ const Sync = {
           body = { action: 'deleteSession', session: head.session };
         }
         if (!body || !body.session) { q.splice(0, consumed); State.save(); continue; }   // game was deleted locally
-        const data = await this.post(body);
+        let data;
+        try { data = await this.post(body); }
+        catch (e) {
+          if (!e.script || e.fatal) throw e;                       // network trouble or a bad passcode: stop and retry later
+          head.fails = (head.fails || 0) + 1; State.save();
+          if (head.fails < 3) throw e;
+          // The sheet keeps refusing this item: set it aside so the taps behind it still go through.
+          State.data.parked.push(...q.splice(0, consumed).map(x => Object.assign({}, x, { error: e.message })));
+          State.save(); this.lastError = e.message; this.render();
+          continue;
+        }
         if (data.skipped && data.skipped.length) UI.toast(data.skipped[0]);
         if (head.kind === 'delete') setTimeout(() => this.pullSessions(), 500);
         q.splice(0, consumed); State.save();
@@ -735,6 +747,7 @@ const Sync = {
     if (this.configured()) {
       if (this.lastError) { const short = /fetch|network|load failed/i.test(this.lastError) ? 'offline' : (this.lastError.length > 24 ? 'error' : this.lastError); cls = 'err'; text = n ? `${n} waiting · ${short}` : 'Error'; }
       else if (n) { cls = 'pending'; text = this.busy ? `Sending ${n}…` : `${n} pending`; }
+      else if (State.data.parked.length) { cls = 'err'; text = `Live · ${State.data.parked.length} set aside`; }
       else { cls = 'live'; text = 'Live'; }
     }
     for (const id of ['syncPillHome', 'syncPillGame']) { const el = document.getElementById(id); if (el) { el.className = 'pill ' + cls; el.textContent = text; } }
@@ -781,8 +794,11 @@ const Sync = {
   renderQueueInfo() {
     const el = document.getElementById('queueInfo'); if (!el) return;
     const n = State.data.queue.length;
-    el.textContent = !this.configured() ? (n ? `${n} item(s) will send once the connection is set up.` : 'Not connected yet.')
-      : (n ? `${n} item(s) waiting to send.` : 'Nothing waiting; everything is on the sheet.') + (this.lastError ? ` Last error: ${this.lastError}` : '');
+    const pk = State.data.parked.length;
+    el.textContent = (!this.configured() ? (n ? `${n} item(s) will send once the connection is set up.` : 'Not connected yet.')
+      : (n ? `${n} item(s) waiting to send.` : 'Nothing waiting; everything is on the sheet.') + (this.lastError ? ` Last error: ${this.lastError}` : ''))
+      + (pk ? ` ${pk} item(s) were set aside because the sheet refused them (${State.data.parked[0].error}).` : '');
+    const rb = document.getElementById('retryParkedBtn'); if (rb) rb.hidden = !pk;
   },
   shareLink() {
     const b = btoa(JSON.stringify({ url: this.cfg.url, token: this.cfg.token })).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
@@ -792,6 +808,11 @@ const Sync = {
     const box = document.getElementById('shareBox'); if (!box) return;
     box.hidden = !this.configured();
     if (this.configured()) document.getElementById('shareLink').value = this.shareLink();
+  },
+  retryParked() {
+    const items = State.data.parked.map(x => { const c = Object.assign({}, x); delete c.error; delete c.fails; return c; });
+    State.data.parked = []; State.data.queue = items.concat(State.data.queue); State.save();
+    this.lastError = ''; this.render(); this.flush(true);
   },
   /* Re-queue a whole game (e.g. one recorded before the connection was set up). The sheet ignores entries it already has. */
   resendGame() {
